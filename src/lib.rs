@@ -1,3 +1,6 @@
+use rand::prelude::*;
+use std::error::Error;
+
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum PixelCanvasError {
@@ -19,18 +22,24 @@ pub struct RGBA {
     pub a: u8,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy, PartialEq)]
 pub struct Position {
-    x: u32,
-    y: u32,
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Clone, Debug, Copy)]
+pub struct SnakeCell {
+    pub pos: Position,
+    pub dir: Direction,
 }
 
 #[derive(Debug)]
 pub struct Snake {
-    head_texture: Vec<u8>,
-    tail_texture: Vec<u8>,
-    cell_texture: Vec<u8>,
-    cells: Vec<Position>,
+    // head_texture: Vec<u8>,
+    // tail_texture: Vec<u8>,
+    // cell_texture: Vec<u8>,
+    pub cells: Vec<SnakeCell>,
 }
 
 #[derive(Debug, Clone)]
@@ -61,14 +70,45 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn draw(&mut self, position: Position, texture: Vec<u8>){
-
+    pub fn draw(&mut self, position: Position, color: RGBA) {
+        match &self.grid {
+            Some(grid) => {
+                for i in 0..self.unit_size {
+                    for j in 0..self.unit_size {
+                        let index: usize = (self.pixel_width as usize
+                            * (position.y * self.unit_size
+                                + grid.thickness as u32 * (position.y + 1)
+                                + j) as usize
+                            + (position.x * self.unit_size
+                                + grid.thickness as u32 * (position.x + 1)
+                                + i) as usize)
+                            * 4;
+                        self.raw_buffer[index] = color.r;
+                        self.raw_buffer[index + 1] = color.g;
+                        self.raw_buffer[index + 2] = color.b;
+                        self.raw_buffer[index + 3] = color.a;
+                    }
+                }
+            }
+            None => {
+                for i in 0..self.unit_size {
+                    for j in 0..self.unit_size {
+                        let index: usize = (self.pixel_width as usize
+                            * (position.y * self.unit_size + j) as usize
+                            + (position.x * self.unit_size + i) as usize)
+                            * 4;
+                        self.raw_buffer[index] = color.r;
+                        self.raw_buffer[index + 1] = color.g;
+                        self.raw_buffer[index + 2] = color.b;
+                        self.raw_buffer[index + 3] = color.a;
+                    }
+                }
+            }
+        }
     }
-    pub fn draw_board(&mut self){
+    pub fn clear(&mut self) {
         // Fill the board
-        let mut raw_buffer: Vec<u8> =
-            vec![0; (self.pixel_width * self.pixel_height * 4) as usize];
-        raw_buffer.chunks_exact_mut(4).for_each(|chunk| {
+        self.raw_buffer.chunks_exact_mut(4).for_each(|chunk| {
             let (first, _) = chunk.split_at_mut(4);
             first[0] = self.cell_color.r;
             first[1] = self.cell_color.g;
@@ -83,12 +123,11 @@ impl Board {
                 .for_each(|i| {
                     for k in 0..grid.thickness {
                         for j in 0..self.pixel_height {
-                            let index: usize =
-                                ((self.pixel_width * j + i + k as u32) * 4) as usize;
-                            raw_buffer[index] = grid.color.r;
-                            raw_buffer[index + 1] = grid.color.g;
-                            raw_buffer[index + 2] = grid.color.b;
-                            raw_buffer[index + 3] = grid.color.a;
+                            let index: usize = ((self.pixel_width * j + i + k as u32) * 4) as usize;
+                            self.raw_buffer[index] = grid.color.r;
+                            self.raw_buffer[index + 1] = grid.color.g;
+                            self.raw_buffer[index + 2] = grid.color.b;
+                            self.raw_buffer[index + 3] = grid.color.a;
                         }
                     }
                 });
@@ -100,16 +139,15 @@ impl Board {
                         for j in 0..self.pixel_width {
                             let index: usize =
                                 ((self.pixel_width * (i + k as u32) + j) * 4) as usize;
-                            raw_buffer[index] = grid.color.r;
-                            raw_buffer[index + 1] = grid.color.g;
-                            raw_buffer[index + 2] = grid.color.b;
-                            raw_buffer[index + 3] = grid.color.a;
+                            self.raw_buffer[index] = grid.color.r;
+                            self.raw_buffer[index + 1] = grid.color.g;
+                            self.raw_buffer[index + 2] = grid.color.b;
+                            self.raw_buffer[index + 3] = grid.color.a;
                         }
                     }
                 });
-            }
-            self.raw_buffer = raw_buffer;
         }
+    }
 }
 
 impl BoardBuilder {
@@ -175,21 +213,193 @@ impl BoardBuilder {
     }
 }
 
-enum Direction {
+#[derive(Copy, Clone, Debug)]
+pub enum Direction {
     N,
     E,
     S,
     W,
 }
 
-struct Joint {
-    direction: Direction,
-    position: Position,
+pub struct Joint {
+    pub direction: Direction,
+    pub position: Position,
 }
 
-struct Game {
-    board: Board,
-    snake: Snake,
-    food: Vec<Position>,
-    joints: Vec<Joint>,
+pub struct Game {
+    pub board: Board,
+    pub snake: Snake,
+    pub food: Vec<Position>,
+    pub joints: Vec<Joint>,
+    food_couter_mod: i32,
+    food_couter: i32,
+    pub joint_flag: bool, // food_seed: i32,
+                          // pub head: Position,
+                          // pub direction: Direction,
+}
+
+impl Game {
+    pub fn new() -> Result<Self, Box<dyn Error>> {
+        let mut board: Board = BoardBuilder::new(20, 20, 16)
+            .unwrap()
+            .with_grid(
+                5,
+                RGBA {
+                    r: 143,
+                    g: 190,
+                    b: 103,
+                    a: 255,
+                },
+            )
+            .unwrap()
+            .with_default_background_color(RGBA {
+                r: 255,
+                g: 255,
+                b: 255,
+                a: 255,
+            })
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let snake = Snake {
+            cells: vec![
+                SnakeCell {
+                    pos: Position { x: 3, y: 0 },
+                    dir: Direction::E,
+                },
+                SnakeCell {
+                    pos: Position { x: 2, y: 0 },
+                    dir: Direction::E,
+                },
+                SnakeCell {
+                    pos: Position { x: 1, y: 0 },
+                    dir: Direction::E,
+                },
+            ],
+        };
+
+        Ok(Game {
+            board: board,
+            snake: snake,
+            food: Vec::new(),
+            food_couter_mod: 40,
+            food_couter: 0,
+            joints: Vec::new(), // food_seed: 0, // joins: Vec<Joint>::new()
+            joint_flag: false,
+        })
+    }
+
+    pub fn update(&mut self) {
+        if self.food_couter == 0 {
+            let mut rng = rand::thread_rng();
+            let x = rng.gen_range(0..self.board.width);
+            let y = rng.gen_range(0..self.board.height);
+            self.food.push(Position { x, y });
+        }
+        self.food_couter = (self.food_couter + 1) % self.food_couter_mod;
+
+        // Update directions
+        for cell in self.snake.cells.iter_mut() {
+            for joint in self.joints.iter() {
+                if joint.position == cell.pos {
+                    cell.dir = joint.direction;
+                }
+            }
+        }
+
+        if let Some(last_cell) = self.snake.cells.last() {
+            if !self.joints.is_empty() && last_cell.pos == self.joints[0].position {
+                self.joints.remove(0);
+            }
+        }
+        let last = self.snake.cells[self.snake.cells.len() - 1];
+
+        for cell in self.snake.cells.iter_mut() {
+            match cell.dir {
+                Direction::S => {
+                    if cell.pos.y == 0 {
+                        cell.pos.y = self.board.height - 1;
+                    } else {
+                        cell.pos.y -= 1;
+                    }
+                }
+                Direction::N => {
+                    if cell.pos.y == self.board.height - 1 {
+                        cell.pos.y = 0;
+                    } else {
+                        cell.pos.y += 1;
+                    }
+                }
+                Direction::E => {
+                    if cell.pos.x == self.board.width - 1 {
+                        cell.pos.x = 0;
+                    } else {
+                        cell.pos.x += 1;
+                    }
+                }
+                Direction::W => {
+                    if cell.pos.x == 0 {
+                        cell.pos.x = self.board.width - 1;
+                    } else {
+                        cell.pos.x -= 1;
+                    }
+                }
+            }
+        }
+
+        let &mut top = &mut self.snake.cells[0];
+        for i in 0..self.food.len() {
+            if top.pos == self.food[i] {
+                println!("Eaten: {:?}", self.food[i]);
+                self.food.remove(i);
+                self.snake.cells.push(last);
+                break;
+                todo!();
+            }
+        }
+        let head = self.snake.cells[0].pos;
+        for i in 1..self.snake.cells.len(){
+            if head == self.snake.cells[i].pos{
+                println!("Game Over");
+                panic!();
+            }
+        }
+
+        // Check if snake bited itself
+
+        self.joint_flag = false;
+    }
+
+    pub fn draw(&mut self) {
+        self.board.clear();
+        for cell in self.snake.cells.iter() {
+            self.board.draw(
+                // self.snake.cells[0].pos,
+                cell.pos,
+                RGBA {
+                    r: 100,
+                    g: 100,
+                    b: 0,
+                    a: 255,
+                },
+            );
+        }
+
+        for food_cell in self.food.iter() {
+            self.board.draw(
+                *food_cell,
+                RGBA {
+                    r: 255,
+                    g: 100,
+                    b: 100,
+                    a: 255,
+                },
+            )
+        }
+    }
+
+    // pub fn run(){
+    //
+    // }
 }

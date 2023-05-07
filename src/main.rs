@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate glium;
+
 #[allow(unused_imports)]
 use glium::{glutin, Surface};
 
@@ -22,28 +23,7 @@ fn main() {
     let cb = glutin::ContextBuilder::new();
     let display = glium::Display::new(wb, cb, &event_loop).unwrap();
 
-    let mut board: Board = BoardBuilder::new(20, 20, 16)
-        .unwrap()
-        .with_grid(
-            5,
-            RGBA {
-                r: 143,
-                g: 190,
-                b: 103,
-                a: 255,
-            },
-        )
-        .unwrap()
-        .with_default_background_color(RGBA {
-            r: 255,
-            g: 255,
-            b: 255,
-            a: 255,
-        })
-        .unwrap()
-        .build()
-        .unwrap();
-    board.draw_board();
+    let mut game = Game::new().unwrap();
 
     implement_vertex!(Vertex, position, tex_coords);
     let vertex1 = Vertex {
@@ -52,24 +32,21 @@ fn main() {
     };
     let vertex2 = Vertex {
         position: [-0.9, 0.9],
-        // tex_coords: [0.0, 300.0 / bb.pixel_height as f32],
         tex_coords: [0.0, 1.0],
     };
     let vertex3 = Vertex {
         position: [0.9, -0.9],
-        // tex_coords: [300.0 / bb.pixel_width as f32, 0.0],
         tex_coords: [1.0, 0.0],
     };
     let vertex4 = Vertex {
         position: [0.9, 0.9],
-        // tex_coords: [300.0 / bb.pixel_width as f32, 300.0 / bb.pixel_height as f32],
         tex_coords: [1.0, 1.0],
     };
     let shape = vec![vertex2, vertex3, vertex4, vertex2, vertex1, vertex3];
     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
     let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
-    const TARGET_FPS: u64 = 60;
+    const TARGET_FPS: u64 = 2;
 
     let vertex_shader_src = r#"
         #version 140
@@ -117,16 +94,81 @@ fn main() {
                 glutin::event::WindowEvent::KeyboardInput { input, .. } => {
                     if input.state == glutin::event::ElementState::Pressed {
                         if let Some(key) = input.virtual_keycode {
+                            let mut top = &mut game.snake.cells[0];
                             match key {
-                                glutin::event::VirtualKeyCode::C => delta = -delta,
-                                glutin::event::VirtualKeyCode::R => t = 0.0,
                                 glutin::event::VirtualKeyCode::Q => {
                                     *control_flow = glutin::event_loop::ControlFlow::Exit;
+                                    return;
+                                }
+                                glutin::event::VirtualKeyCode::H => {
+                                    if (!game.joint_flag) {
+                                        match top.dir {
+                                            Direction::E => {}
+                                            _ => {
+                                                top.dir = Direction::W;
+                                                game.joints.push(Joint {
+                                                    position: top.pos,
+                                                    direction: top.dir,
+                                                });
+                                                game.joint_flag = true;
+                                            }
+                                        }
+                                    }
+                                    return;
+                                }
+                                glutin::event::VirtualKeyCode::J => {
+                                    if (!game.joint_flag) {
+                                        match top.dir {
+                                            Direction::S => {}
+                                            _ => {
+                                                top.dir = Direction::N;
+                                                game.joints.push(Joint {
+                                                    position: top.pos,
+                                                    direction: top.dir,
+                                                });
+                                                game.joint_flag = true;
+                                            }
+                                        }
+                                    }
+                                    return;
+                                }
+                                glutin::event::VirtualKeyCode::K => {
+                                    if (!game.joint_flag) {
+                                        match top.dir {
+                                            Direction::N => {}
+                                            _ => {
+                                                top.dir = Direction::S;
+                                                game.joints.push(Joint {
+                                                    position: top.pos,
+                                                    direction: top.dir,
+                                                });
+                                                game.joint_flag = true;
+                                            }
+                                        }
+                                    }
+                                    return;
+                                }
+                                glutin::event::VirtualKeyCode::L => {
+                                    if (!game.joint_flag) {
+                                        match top.dir {
+                                            Direction::W => {}
+                                            _ => {
+                                                top.dir = Direction::E;
+                                                game.joints.push(Joint {
+                                                    position: top.pos,
+                                                    direction: top.dir,
+                                                });
+                                                game.joint_flag = true;
+                                            }
+                                        }
+                                    }
                                     return;
                                 }
                                 _ => {}
                             }
                         }
+                    } else {
+                        return;
                     }
                 }
                 _ => return,
@@ -152,16 +194,16 @@ fn main() {
         *control_flow = glutin::event_loop::ControlFlow::WaitUntil(new_inst);
 
         // t += delta;
-
+        game.update();
+        game.draw();
         let image = glium::texture::RawImage2d::from_raw_rgba_reversed(
-            &board.raw_buffer,
-            (board.pixel_width, board.pixel_height),
+            &game.board.raw_buffer,
+            (game.board.pixel_width, game.board.pixel_height),
         );
         let texture = glium::texture::SrgbTexture2d::new(&display, image).unwrap();
 
         let mut target = display.draw();
         target.clear_color(143.0 / 255.0, 190.0 / 255.0, 103.0 / 255.0, 1.0);
-
 
         let sampler = glium::uniforms::Sampler::new(&texture)
             .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
