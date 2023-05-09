@@ -450,32 +450,14 @@ pub fn run(mut game: Game) {
             width: 600.0,
             height: 600.0,
         });
+
     let cb = glutin::ContextBuilder::new();
     let display = glium::Display::new(wb, cb, &event_loop).unwrap();
 
-    let vertex1 = Vertex {
-        position: [-0.9, -0.9],
-        tex_coords: [0.0, 0.0],
-    };
-    let vertex2 = Vertex {
-        position: [-0.9, 0.9],
-        tex_coords: [0.0, 1.0],
-    };
-    let vertex3 = Vertex {
-        position: [0.9, -0.9],
-        tex_coords: [1.0, 0.0],
-    };
-    let vertex4 = Vertex {
-        position: [0.9, 0.9],
-        tex_coords: [1.0, 1.0],
-    };
-    let shape = vec![vertex2, vertex3, vertex4, vertex2, vertex1, vertex3];
-    let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
-    let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+    implement_vertex!(Vertex, position, tex_coords);
 
     const TARGET_FPS: u64 = 2;
 
-    implement_vertex!(Vertex, position, tex_coords);
     let program = init_shaders(&display).unwrap();
     event_loop.run(move |event, _, control_flow| {
         let start_time = std::time::Instant::now();
@@ -588,6 +570,9 @@ pub fn run(mut game: Game) {
 
         *control_flow = glutin::event_loop::ControlFlow::WaitUntil(new_inst);
 
+        let shape = get_shape(&display, &game);
+        let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
+        let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
         game.update();
         game.draw();
         let image = glium::texture::RawImage2d::from_raw_rgba_reversed(
@@ -615,4 +600,51 @@ pub fn run(mut game: Game) {
             .unwrap();
         target.finish().unwrap();
     });
+}
+
+fn get_shape(display: &glium::Display, game: &Game) -> Vec<Vertex> {
+    let mut vertex1 = Vertex {
+        position: [-0.9, -0.9],
+        tex_coords: [0.0, 0.0],
+    };
+    let mut vertex2 = Vertex {
+        position: [-0.9, 0.9],
+        tex_coords: [0.0, 1.0],
+    };
+    let mut vertex3 = Vertex {
+        position: [0.9, -0.9],
+        tex_coords: [1.0, 0.0],
+    };
+    let mut vertex4 = Vertex {
+        position: [0.9, 0.9],
+        tex_coords: [1.0, 1.0],
+    };
+    let dimensions = display.gl_window().window().inner_size();
+    let (window_real_width, window_real_height) =
+        (dimensions.width as u32, dimensions.height as u32);
+    let window_aspect_ratio = window_real_width as f32 / window_real_height as f32;
+
+    let (board_width, board_height) = (game.board.pixel_width, game.board.pixel_height);
+    let board_aspect_ratio = board_width as f32 / board_height as f32;
+
+    if window_aspect_ratio < 1.0 && board_aspect_ratio >= 1.0
+        || board_aspect_ratio >= window_aspect_ratio
+    {
+        let new_height =
+            window_real_width as f32 / (board_aspect_ratio * window_real_height as f32);
+        vertex1.position = [-1.0, -new_height];
+        vertex2.position = [-1.0, new_height];
+        vertex3.position = [1.0, -new_height];
+        vertex4.position = [1.0, new_height];
+    } else if window_aspect_ratio >= 1.0 && board_aspect_ratio < 1.0
+        || window_aspect_ratio > board_aspect_ratio
+    {
+        let new_width = window_real_height as f32 * board_aspect_ratio / window_real_width as f32;
+        vertex1.position = [-new_width, -1.0];
+        vertex2.position = [-new_width, 1.0];
+        vertex3.position = [new_width, -1.0];
+        vertex4.position = [new_width, 1.0];
+    }
+
+    vec![vertex2, vertex3, vertex4, vertex2, vertex1, vertex3]
 }
