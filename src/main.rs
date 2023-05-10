@@ -1,6 +1,6 @@
 use rusty_snake::*;
 
 fn main() {
-    let game = Game::new().unwrap();
+    let game = game::Game::new().unwrap();
     run(game);
 }
