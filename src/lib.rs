@@ -462,106 +462,13 @@ pub fn run(mut game: Game) {
     event_loop.run(move |event, _, control_flow| {
         let start_time = std::time::Instant::now();
 
-        match event {
-            glutin::event::Event::WindowEvent { event, .. } => match event {
-                glutin::event::WindowEvent::CloseRequested => {
-                    *control_flow = glutin::event_loop::ControlFlow::Exit;
-                    return;
-                }
-                glutin::event::WindowEvent::KeyboardInput { input, .. } => {
-                    if input.state == glutin::event::ElementState::Pressed {
-                        if let Some(key) = input.virtual_keycode {
-                            let mut top = &mut game.snake.cells[0];
-                            match key {
-                                glutin::event::VirtualKeyCode::Q => {
-                                    *control_flow = glutin::event_loop::ControlFlow::Exit;
-                                    return;
-                                }
-                                glutin::event::VirtualKeyCode::H => {
-                                    if !game.joint_flag {
-                                        match top.dir {
-                                            Direction::E => {}
-                                            _ => {
-                                                top.dir = Direction::W;
-                                                game.joints.push(Joint {
-                                                    position: top.pos,
-                                                    direction: top.dir,
-                                                });
-                                                game.joint_flag = true;
-                                            }
-                                        }
-                                    }
-                                    return;
-                                }
-                                glutin::event::VirtualKeyCode::J => {
-                                    if !game.joint_flag {
-                                        match top.dir {
-                                            Direction::S => {}
-                                            _ => {
-                                                top.dir = Direction::N;
-                                                game.joints.push(Joint {
-                                                    position: top.pos,
-                                                    direction: top.dir,
-                                                });
-                                                game.joint_flag = true;
-                                            }
-                                        }
-                                    }
-                                    return;
-                                }
-                                glutin::event::VirtualKeyCode::K => {
-                                    if !game.joint_flag {
-                                        match top.dir {
-                                            Direction::N => {}
-                                            _ => {
-                                                top.dir = Direction::S;
-                                                game.joints.push(Joint {
-                                                    position: top.pos,
-                                                    direction: top.dir,
-                                                });
-                                                game.joint_flag = true;
-                                            }
-                                        }
-                                    }
-                                    return;
-                                }
-                                glutin::event::VirtualKeyCode::L => {
-                                    if !game.joint_flag {
-                                        match top.dir {
-                                            Direction::W => {}
-                                            _ => {
-                                                top.dir = Direction::E;
-                                                game.joints.push(Joint {
-                                                    position: top.pos,
-                                                    direction: top.dir,
-                                                });
-                                                game.joint_flag = true;
-                                            }
-                                        }
-                                    }
-                                    return;
-                                }
-                                _ => {}
-                            }
-                        }
-                    } else {
-                        return;
-                    }
-                }
-                _ => return,
-            },
-            glutin::event::Event::NewEvents(cause) => match cause {
-                glutin::event::StartCause::ResumeTimeReached { .. } => (),
-                glutin::event::StartCause::Init => (),
-                _ => return,
-            },
-            _ => return,
+        if let InputHandleType::BREAK = handle_input(event, control_flow, &mut game) {
+            return;
         }
 
         let elapsed_time = std::time::Instant::now()
             .duration_since(start_time)
             .as_millis() as u64;
-
         let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
             true => 1000 / TARGET_FPS - elapsed_time,
             false => 0,
@@ -573,6 +480,7 @@ pub fn run(mut game: Game) {
         let shape = get_shape(&display, &game);
         let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+
         game.update();
         game.draw();
         let image = glium::texture::RawImage2d::from_raw_rgba_reversed(
@@ -647,4 +555,112 @@ fn get_shape(display: &glium::Display, game: &Game) -> Vec<Vertex> {
     }
 
     vec![vertex2, vertex3, vertex4, vertex2, vertex1, vertex3]
+}
+
+enum InputHandleType {
+    PROCEED,
+    BREAK,
+}
+
+fn handle_input(
+    event: glutin::event::Event<()>,
+    control_flow: &mut glutin::event_loop::ControlFlow,
+    game: &mut Game,
+) -> InputHandleType {
+    match event {
+        glutin::event::Event::WindowEvent { event, .. } => match event {
+            glutin::event::WindowEvent::CloseRequested => {
+                *control_flow = glutin::event_loop::ControlFlow::Exit;
+                return InputHandleType::BREAK;
+            }
+            glutin::event::WindowEvent::KeyboardInput { input, .. } => {
+                if input.state == glutin::event::ElementState::Pressed {
+                    if let Some(key) = input.virtual_keycode {
+                        let mut top = &mut game.snake.cells[0];
+                        match key {
+                            glutin::event::VirtualKeyCode::Q => {
+                                *control_flow = glutin::event_loop::ControlFlow::Exit;
+                                return InputHandleType::BREAK;
+                            }
+                            glutin::event::VirtualKeyCode::H => {
+                                if !game.joint_flag {
+                                    match top.dir {
+                                        Direction::E => {}
+                                        _ => {
+                                            top.dir = Direction::W;
+                                            game.joints.push(Joint {
+                                                position: top.pos,
+                                                direction: top.dir,
+                                            });
+                                            game.joint_flag = true;
+                                        }
+                                    }
+                                }
+                                return InputHandleType::BREAK;
+                            }
+                            glutin::event::VirtualKeyCode::J => {
+                                if !game.joint_flag {
+                                    match top.dir {
+                                        Direction::S => {}
+                                        _ => {
+                                            top.dir = Direction::N;
+                                            game.joints.push(Joint {
+                                                position: top.pos,
+                                                direction: top.dir,
+                                            });
+                                            game.joint_flag = true;
+                                        }
+                                    }
+                                }
+                                return InputHandleType::BREAK;
+                            }
+                            glutin::event::VirtualKeyCode::K => {
+                                if !game.joint_flag {
+                                    match top.dir {
+                                        Direction::N => {}
+                                        _ => {
+                                            top.dir = Direction::S;
+                                            game.joints.push(Joint {
+                                                position: top.pos,
+                                                direction: top.dir,
+                                            });
+                                            game.joint_flag = true;
+                                        }
+                                    }
+                                }
+                                return InputHandleType::BREAK;
+                            }
+                            glutin::event::VirtualKeyCode::L => {
+                                if !game.joint_flag {
+                                    match top.dir {
+                                        Direction::W => {}
+                                        _ => {
+                                            top.dir = Direction::E;
+                                            game.joints.push(Joint {
+                                                position: top.pos,
+                                                direction: top.dir,
+                                            });
+                                            game.joint_flag = true;
+                                        }
+                                    }
+                                }
+                                return InputHandleType::BREAK;
+                            }
+                            _ => {}
+                        }
+                    }
+                } else {
+                    return InputHandleType::BREAK;
+                }
+            }
+            _ => return InputHandleType::BREAK,
+        },
+        glutin::event::Event::NewEvents(cause) => match cause {
+            glutin::event::StartCause::ResumeTimeReached { .. } => (),
+            glutin::event::StartCause::Init => (),
+            _ => return InputHandleType::BREAK,
+        },
+        _ => return InputHandleType::BREAK,
+    }
+    InputHandleType::PROCEED
 }
