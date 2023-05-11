@@ -81,10 +81,7 @@ impl Board {
                                 + grid.thickness as u32 * (position.x + 1)
                                 + i) as usize)
                             * 4;
-                        self.raw_buffer[index] = color.r;
-                        self.raw_buffer[index + 1] = color.g;
-                        self.raw_buffer[index + 2] = color.b;
-                        self.raw_buffer[index + 3] = color.a;
+                        Self::set_pixel_color(&mut self.raw_buffer, index, &color);
                     }
                 }
             }
@@ -95,10 +92,7 @@ impl Board {
                             * (position.y * self.unit_size + j) as usize
                             + (position.x * self.unit_size + i) as usize)
                             * 4;
-                        self.raw_buffer[index] = color.r;
-                        self.raw_buffer[index + 1] = color.g;
-                        self.raw_buffer[index + 2] = color.b;
-                        self.raw_buffer[index + 3] = color.a;
+                        Self::set_pixel_color(&mut self.raw_buffer, index, &color);
                     }
                 }
             }
@@ -108,10 +102,7 @@ impl Board {
         // Fill the board
         self.raw_buffer.chunks_exact_mut(4).for_each(|chunk| {
             let (first, _) = chunk.split_at_mut(4);
-            first[0] = self.cell_color.r;
-            first[1] = self.cell_color.g;
-            first[2] = self.cell_color.b;
-            first[3] = self.cell_color.a;
+            Self::set_pixel_color(first, 0, &self.cell_color);
         });
 
         // Draw the grid
@@ -122,10 +113,7 @@ impl Board {
                     for k in 0..grid.thickness {
                         for j in 0..self.pixel_height {
                             let index: usize = ((self.pixel_width * j + i + k as u32) * 4) as usize;
-                            self.raw_buffer[index] = grid.color.r;
-                            self.raw_buffer[index + 1] = grid.color.g;
-                            self.raw_buffer[index + 2] = grid.color.b;
-                            self.raw_buffer[index + 3] = grid.color.a;
+                            Self::set_pixel_color(&mut self.raw_buffer, index, &grid.color);
                         }
                     }
                 });
@@ -137,14 +125,18 @@ impl Board {
                         for j in 0..self.pixel_width {
                             let index: usize =
                                 ((self.pixel_width * (i + k as u32) + j) * 4) as usize;
-                            self.raw_buffer[index] = grid.color.r;
-                            self.raw_buffer[index + 1] = grid.color.g;
-                            self.raw_buffer[index + 2] = grid.color.b;
-                            self.raw_buffer[index + 3] = grid.color.a;
+                            Self::set_pixel_color(&mut self.raw_buffer, index, &grid.color);
                         }
                     }
                 });
         }
+    }
+
+    pub fn set_pixel_color(raw_buffer: &mut [u8], index: usize, color: &RGBA) {
+        raw_buffer[index] = color.r;
+        raw_buffer[index + 1] = color.g;
+        raw_buffer[index + 2] = color.b;
+        raw_buffer[index + 3] = color.a;
     }
 }
 
@@ -192,10 +184,7 @@ impl BoardBuilder {
             vec![0; (total_pixel_width * total_pixel_height * 4) as usize];
         raw_buffer.chunks_exact_mut(4).for_each(|chunk| {
             let (first, _) = chunk.split_at_mut(4);
-            first[0] = self.cell_color.r;
-            first[1] = self.cell_color.g;
-            first[2] = self.cell_color.b;
-            first[3] = self.cell_color.a;
+            Board::set_pixel_color(first, 0, &self.cell_color);
         });
 
         Ok(Board {
