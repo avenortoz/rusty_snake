@@ -68,7 +68,7 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn draw(&mut self, position: Position, color: RGBA) {
+    pub fn draw(&mut self, position: Position, color: &RGBA) {
         match &self.grid {
             Some(grid) => {
                 for i in 0..self.unit_size {
@@ -81,7 +81,7 @@ impl Board {
                                 + grid.thickness as u32 * (position.x + 1)
                                 + i) as usize)
                             * 4;
-                        Self::set_pixel_color(&mut self.raw_buffer, index, &color);
+                        Self::set_pixel_color(&mut self.raw_buffer, index, color);
                     }
                 }
             }
@@ -92,7 +92,7 @@ impl Board {
                             * (position.y * self.unit_size + j) as usize
                             + (position.x * self.unit_size + i) as usize)
                             * 4;
-                        Self::set_pixel_color(&mut self.raw_buffer, index, &color);
+                        Self::set_pixel_color(&mut self.raw_buffer, index, color);
                     }
                 }
             }
@@ -209,6 +209,7 @@ pub enum Direction {
 }
 
 impl Direction {
+    #[must_use]
     pub fn reverse(&self) -> Direction {
         match self {
             Self::N => Direction::S,
@@ -296,8 +297,8 @@ impl Game {
         self.food_couter = (self.food_couter + 1) % self.food_couter_mod;
 
         // Update directions
-        for cell in self.snake.cells.iter_mut() {
-            for joint in self.joints.iter() {
+        for cell in &mut self.snake.cells {
+            for joint in &self.joints {
                 if joint.position == cell.pos {
                     cell.dir = joint.direction;
                 }
@@ -311,7 +312,7 @@ impl Game {
         }
         let last = self.snake.cells[self.snake.cells.len() - 1];
 
-        for cell in self.snake.cells.iter_mut() {
+        for cell in &mut self.snake.cells {
             match cell.dir {
                 Direction::S => {
                     if cell.pos.y == 0 {
@@ -366,10 +367,10 @@ impl Game {
 
     pub fn draw(&mut self) {
         self.board.clear();
-        for cell in self.snake.cells.iter() {
+        for cell in &self.snake.cells {
             self.board.draw(
                 cell.pos,
-                RGBA {
+                &RGBA {
                     r: 100,
                     g: 100,
                     b: 0,
@@ -378,16 +379,16 @@ impl Game {
             );
         }
 
-        for food_cell in self.food.iter() {
+        for food_cell in &self.food {
             self.board.draw(
                 *food_cell,
-                RGBA {
+                &RGBA {
                     r: 255,
                     g: 100,
                     b: 100,
                     a: 255,
                 },
-            )
+            );
         }
     }
     pub fn add_joint(&mut self, direction: Direction) {
